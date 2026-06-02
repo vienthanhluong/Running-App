@@ -383,22 +383,222 @@ function haversine(lat1, lon1, lat2, lon2) {
 }
 
 // ===== PLAN BUILDER =====
+// Draft plan held in memory while building
+let draftPlan = { name:'', startDate:'', endDate:'', goal:'', weeks:[] };
+let builderWeekIdx = 0;
+
 function openNewPlan() {
-  const today = isoDate();
-  document.getElementById('planStart').value = today;
+  draftPlan = { name:'', startDate:'', endDate:'', goal:'', weeks:[] };
+  builderWeekIdx = 0;
+  document.getElementById('planName').value = '';
+  document.getElementById('planStart').value = isoDate();
+  document.getElementById('planEnd').value = '';
+  document.getElementById('planGoal').value = '';
+  document.getElementById('planDateInfo').innerHTML = '';
+  document.getElementById('planStep1').style.display = '';
+  document.getElementById('planStep2').style.display = 'none';
+  document.getElementById('planStepLabel').textContent = 'STEP 1 OF 2';
   openModal('modalNewPlan');
 }
 
-function setRpw(btn) {
-  document.querySelectorAll('#runsPerWeekGrid .run-type-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  state.planRpw = parseInt(btn.dataset.rpw);
+function updatePlanDates() {
+  const s = document.getElementById('planStart').value;
+  const e = document.getElementById('planEnd').value;
+  if (!s || !e) return;
+  const start = new Date(s), end = new Date(e);
+  if (end <= start) { document.getElementById('planDateInfo').innerHTML = `<span style="color:var(--red);font-size:12px">End date must be after start date</span>`; return; }
+  const days = Math.round((end - start) / 86400000);
+  const weeks = Math.ceil(days / 7);
+  document.getElementById('planDateInfo').innerHTML = `<span style="color:var(--text2);font-size:12px;font-family:var(--font-display);letter-spacing:1px">${weeks} WEEKS · ${days} DAYS</span>`;
 }
-function setPlanType(btn) {
-  btn.closest('.run-type-grid').querySelectorAll('.run-type-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  state.planType = btn.dataset.pt;
+
+function goToPlanStep1() {
+  document.getElementById('planStep1').style.display = '';
+  document.getElementById('planStep2').style.display = 'none';
+  document.getElementById('planStepLabel').textContent = 'STEP 1 OF 2';
 }
+
+function goToPlanStep2() {
+  const name = document.getElementById('planName').value.trim();
+  const startDate = document.getElementById('planStart').value;
+  const endDate = document.getElementById('planEnd').value;
+  if (!name) { showToast('Please enter a plan name', 'error'); return; }
+  if (!startDate || !endDate) { showToast('Please set start and end dates', 'error'); return; }
+  if (new Date(endDate) <= new Date(startDate)) { showToast('End date must be after start', 'error'); return; }
+
+  draftPlan.name = name;
+  draftPlan.startDate = startDate;
+  draftPlan.endDate = endDate;
+  draftPlan.goal = document.getElementById('planGoal').value;
+
+  // Build week scaffolding from date range
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const numWeeks = Math.ceil((end - start) / (7 * 86400000));
+  const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  draftPlan.weeks = [];
+  for (let w = 0; w < numWeeks; w++) {
+    const weekStart = new Date(start.getTime() + w * 7 * 86400000);
+    const runs = [];
+    for (let d = 0; d < 7; d++) {
+      const dayDate = new Date(weekStart.getTime() + d * 86400000);
+      if (dayDate > end) break;
+      runs.push({
+        date: isoDate(dayDate),
+        day: DAY_NAMES[dayDate.getDay()],
+        type: 'rest',
+        km: '', duration: '', targetHR: '', targetPace: '',
+        purpose: '', notes: '', completed: false,
+      });
+    }
+    draftPlan.weeks.push({ weekNum: w + 1, runs });
+  }
+
+  document.getElementById('planStep1').style.display = 'none';
+  document.getElementById('planStep2').style.display = '';
+  document.getElementById('planStepLabel').textContent = 'STEP 2 OF 2';
+  builderWeekIdx = 0;
+  renderWeekNav();
+  renderWeekBuilder(0);
+}
+
+function renderWeekNav() {
+  const nav = document.getElementById('planWeekNav');
+  nav.innerHTML = draftPlan.weeks.map((w, i) => {
+    const hasRuns = w.runs.some(r => r.type !== 'rest');
+    return `<button class="week-nav-btn ${i === builderWeekIdx ? 'active' : ''} ${hasRuns ? 'has-runs' : ''}"
+      onclick="switchBuilderWeek(${i})">W${w.weekNum}</button>`;
+  }).join('');
+}
+
+function switchBuilderWeek(idx) {
+  collectCurrentWeek();
+  builderWeekIdx = idx;
+  renderWeekNav();
+  renderWeekBuilder(idx);
+}
+
+function renderWeekBuilder(idx) {
+  const week = draftPlan.weeks[idx];
+  const el = document.getElementById('planWeekBuilder');
+  const weekVol = week.runs.reduce((s,r) => s + (parseFloat(r.km)||0), 0);
+
+  el.innerHTML = `
+    <div class="week-builder-header">
+      <div class="week-builder-title">WEEK ${week.weekNum}</div>
+      <div class="week-builder-vol">${weekVol > 0 ? weekVol.toFixed(1) + ' km' : 'no runs yet'}</div>
+    </div>
+    ${week.runs.map((run, ri) => `
+      <div class="run-builder-card" id="rbc-${ri}">
+        <div class="run-builder-top">
+          <div class="run-builder-day">${run.day} <span style="font-size:11px;color:var(--text3)">${fmtDateShort(run.date)}</span></div>
+          <div class="run-type-mini" id="rtm-${ri}">
+            ${['rest','easy','tempo','intervals','long','recovery','race'].map(t =>
+              `<button class="rtype-pill ${run.type===t?'active':''}" data-type="${t}" onclick="setBuilderRunType(${ri},'${t}')">${t}</button>`
+            ).join('')}
+          </div>
+        </div>
+        <div class="run-builder-fields ${run.type === 'rest' ? 'hidden' : ''}" id="rbf-${ri}">
+          <div class="form-row">
+            <div class="form-group">
+              <label>PURPOSE</label>
+              <input type="text" class="form-input" placeholder="e.g. Base building, tempo work" value="${run.purpose||''}"
+                onchange="draftPlan.weeks[${idx}].runs[${ri}].purpose=this.value" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>TARGET DIST (KM)</label>
+              <input type="number" class="form-input" placeholder="10.0" step="0.1" min="0" value="${run.km||''}"
+                onchange="draftPlan.weeks[${idx}].runs[${ri}].km=this.value;updateBuilderVol(${idx})" />
+            </div>
+            <div class="form-group">
+              <label>TARGET TIME</label>
+              <input type="text" class="form-input" placeholder="55:00" value="${run.duration||''}"
+                onchange="draftPlan.weeks[${idx}].runs[${ri}].duration=this.value" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>TARGET PACE</label>
+              <input type="text" class="form-input" placeholder="5:30 /km" value="${run.targetPace||''}"
+                onchange="draftPlan.weeks[${idx}].runs[${ri}].targetPace=this.value" />
+            </div>
+            <div class="form-group">
+              <label>TARGET HR (BPM)</label>
+              <input type="text" class="form-input" placeholder="140–155" value="${run.targetHR||''}"
+                onchange="draftPlan.weeks[${idx}].runs[${ri}].targetHR=this.value" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>NOTES / STRUCTURE</label>
+            <textarea class="form-input" style="min-height:56px" placeholder="e.g. 10min warm up, 4×1km @ 4:30, 10min cool down"
+              onchange="draftPlan.weeks[${idx}].runs[${ri}].notes=this.value">${run.notes||''}</textarea>
+          </div>
+        </div>
+      </div>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:8px">
+      ${idx > 0 ? `<button class="btn-secondary" style="flex:1" onclick="switchBuilderWeek(${idx-1})">← PREV</button>` : ''}
+      ${idx < draftPlan.weeks.length-1 ? `<button class="btn-primary" style="flex:1" onclick="switchBuilderWeek(${idx+1})">NEXT WEEK →</button>` : ''}
+    </div>`;
+}
+
+function setBuilderRunType(ri, type) {
+  draftPlan.weeks[builderWeekIdx].runs[ri].type = type;
+  // Show/hide fields
+  const fields = document.getElementById(`rbf-${ri}`);
+  if (fields) fields.classList.toggle('hidden', type === 'rest');
+  // Update pill active state
+  document.querySelectorAll(`#rtm-${ri} .rtype-pill`).forEach(b => {
+    b.classList.toggle('active', b.dataset.type === type);
+  });
+  updateBuilderVol(builderWeekIdx);
+}
+
+function updateBuilderVol(idx) {
+  const week = draftPlan.weeks[idx];
+  const vol = week.runs.reduce((s,r) => s + (parseFloat(r.km)||0), 0);
+  const el = document.querySelector('.week-builder-vol');
+  if (el) el.textContent = vol > 0 ? vol.toFixed(1) + ' km' : 'no runs yet';
+  renderWeekNav();
+}
+
+function collectCurrentWeek() {
+  // Values are written via onchange handlers directly into draftPlan — nothing extra needed
+}
+
+function savePlan() {
+  collectCurrentWeek();
+  const weeks = draftPlan.weeks.map(week => {
+    const vol = week.runs.reduce((s,r) => s + (parseFloat(r.km)||0), 0);
+    return { ...week, volume: Math.round(vol * 10) / 10 };
+  });
+  const numWeeks = weeks.length;
+  const isEdit = !!draftPlan._editId;
+  const plan = {
+    id: isEdit ? draftPlan._editId : Date.now().toString(),
+    name: draftPlan.name,
+    startDate: draftPlan.startDate,
+    endDate: draftPlan.endDate,
+    goal: draftPlan.goal,
+    numWeeks,
+    weeks,
+    createdAt: isEdit ? (draftPlan.createdAt || isoDate()) : isoDate(),
+    updatedAt: isoDate(),
+  };
+  if (isEdit) {
+    const idx = state.plans.findIndex(p => p.id === draftPlan._editId);
+    if (idx > -1) state.plans[idx] = plan; else state.plans.push(plan);
+  } else {
+    state.plans.push(plan);
+  }
+  save();
+  closeModal('modalNewPlan');
+  showToast(isEdit ? 'Plan updated ✓' : `Plan created: ${numWeeks} weeks 🏃`, 'success');
+  renderPlanList();
+}
+
 function setLevel(btn) {
   btn.closest('.run-type-grid').querySelectorAll('.run-type-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -408,91 +608,6 @@ function setGoal(btn) {
   btn.closest('.run-type-grid').querySelectorAll('.run-type-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   state.profile.goal = btn.dataset.goal;
-}
-
-function generatePlan() {
-  const name = document.getElementById('planName').value || 'Training Plan';
-  const startDate = document.getElementById('planStart').value;
-  const numWeeks = parseInt(document.getElementById('planWeeks').value);
-  const rpw = state.planRpw;
-  const ptype = state.planType;
-
-  if (!startDate) { showToast('Please select a start date', 'error'); return; }
-
-  const WEEK_TEMPLATES = {
-    base: {
-      3: ['easy','long','recovery'],
-      4: ['easy','easy','tempo','long'],
-      5: ['easy','easy','tempo','long','recovery'],
-      6: ['easy','easy','tempo','intervals','long','recovery'],
-    },
-    marathon: {
-      3: ['easy','tempo','long'],
-      4: ['easy','tempo','intervals','long'],
-      5: ['easy','easy','tempo','intervals','long'],
-      6: ['easy','easy','tempo','intervals','long','recovery'],
-    },
-    speed: {
-      3: ['tempo','intervals','easy'],
-      4: ['easy','tempo','intervals','long'],
-      5: ['easy','tempo','intervals','intervals','easy'],
-      6: ['easy','tempo','intervals','intervals','long','recovery'],
-    },
-    custom: {
-      3: ['easy','tempo','long'],
-      4: ['easy','easy','tempo','long'],
-      5: ['easy','easy','tempo','long','recovery'],
-      6: ['easy','easy','tempo','intervals','long','recovery'],
-    },
-  };
-
-  const RUN_DAYS = { 3:[1,3,6], 4:[1,3,5,6], 5:[1,2,3,5,6], 6:[1,2,3,4,5,6] };
-  const BASE_KM = { easy:6, tempo:5, intervals:4, long:10, recovery:4, rest:0 };
-
-  const template = WEEK_TEMPLATES[ptype]?.[rpw] || WEEK_TEMPLATES.base[4];
-  const runDays = RUN_DAYS[rpw] || RUN_DAYS[4];
-
-  const start = new Date(startDate);
-
-  const weeks = [];
-  for (let w = 0; w < numWeeks; w++) {
-    const factor = 1 + w * 0.08 + (w % 4 === 3 ? -0.25 : 0); // step-back weeks
-    const weekStart = new Date(start.getTime() + w * 7 * 86400000);
-    const allDays = [0,1,2,3,4,5,6].map(d => {
-      const date = new Date(weekStart.getTime() + d * 86400000);
-      return isoDate(date);
-    });
-    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const runs = allDays.map((date, dayIdx) => {
-      const pos = runDays.indexOf(dayIdx);
-      if (pos === -1) return { date, day: dayNames[dayIdx], type: 'rest', km: 0 };
-      const type = template[pos] || 'easy';
-      const km = Math.max(3, Math.round(BASE_KM[type] * factor * 10) / 10);
-      return { date, day: dayNames[dayIdx], type, km, completed: false, note: getRunNote(type) };
-    });
-    const vol = runs.reduce((s,r) => s + (r.km||0), 0);
-    weeks.push({ weekNum: w+1, runs, volume: Math.round(vol * 10) / 10 });
-  }
-
-  const plan = {
-    id: Date.now().toString(),
-    name, startDate, numWeeks, rpw, type: ptype,
-    weeks, createdAt: isoDate(),
-  };
-  state.plans.push(plan);
-  save();
-  closeModal('modalNewPlan');
-  showToast(`Plan created: ${numWeeks} weeks 🏃`, 'success');
-  renderPlanList();
-}
-
-function getRunNote(type) {
-  const notes = {
-    easy: 'Conversational pace', tempo: 'Comfortably hard, 80% effort',
-    intervals: '4×1km at 5K pace', long: 'Easy pace, build endurance',
-    recovery: 'Very easy, shake out legs', rest: 'Rest day',
-  };
-  return notes[type] || '';
 }
 
 function renderPlanList() {
@@ -506,6 +621,7 @@ function renderPlanList() {
     const prog = getPlanProgressForPlan(plan);
     const allRuns = plan.weeks.flatMap(w => w.runs.filter(r => r.type !== 'rest'));
     const done = allRuns.filter(r => r.completed).length;
+    const endLabel = plan.endDate ? ` → ${fmtDateShort(plan.endDate)}` : '';
     return `
       <div class="plan-card" onclick="viewPlan('${plan.id}')">
         <div class="plan-card-header">
@@ -514,10 +630,11 @@ function renderPlanList() {
         </div>
         <div class="plan-progress-bar"><div class="plan-progress-fill" style="width:${prog}%"></div></div>
         <div class="plan-card-meta">
-          <div class="plan-meta-item">Started <strong>${fmtDateShort(plan.startDate)}</strong></div>
+          <div class="plan-meta-item">${fmtDateShort(plan.startDate)}${endLabel}</div>
           <div class="plan-meta-item">Runs <strong>${done}/${allRuns.length}</strong></div>
-          <div class="plan-meta-item">Completed <strong>${prog}%</strong></div>
+          <div class="plan-meta-item">Done <strong>${prog}%</strong></div>
         </div>
+        ${plan.goal ? `<div style="font-size:12px;color:var(--text3);margin-top:8px;font-style:italic">${plan.goal}</div>` : ''}
       </div>`;
   }).join('');
 }
@@ -533,33 +650,48 @@ function viewPlan(planId) {
   if (!plan) return;
   document.getElementById('viewPlanTitle').textContent = plan.name.toUpperCase();
   const body = document.getElementById('viewPlanBody');
+
   body.innerHTML = `
+    ${plan.goal ? `<div style="color:var(--text2);font-size:13px;margin-bottom:4px;font-style:italic">🎯 ${plan.goal}</div>` : ''}
+    <div style="color:var(--text3);font-size:12px;margin-bottom:16px;font-family:var(--font-display);letter-spacing:1px">
+      ${fmtDate(plan.startDate)} → ${plan.endDate ? fmtDate(plan.endDate) : '—'}
+    </div>
     <div class="plan-weeks">
-      ${plan.weeks.map(week => `
+      ${plan.weeks.map(week => {
+        const wi = plan.weeks.indexOf(week);
+        const vol = week.volume || week.runs.reduce((s,r)=>s+(parseFloat(r.km)||0),0);
+        return `
         <div class="week-block">
           <div class="week-header">
             <div class="week-title">WEEK ${week.weekNum}</div>
-            <div class="week-vol">${week.volume} km</div>
+            <div class="week-vol">${vol > 0 ? vol.toFixed(1)+' km' : 'rest week'}</div>
           </div>
           <div class="week-runs">
             ${week.runs.map((run, ri) => {
               if (run.type === 'rest') return `
-                <div class="plan-run-item" style="opacity:0.4">
+                <div class="plan-run-item" style="opacity:0.35">
                   <div class="plan-run-day">${run.day}</div>
                   <div class="plan-run-type type-rest">REST</div>
+                  <div style="font-size:11px;color:var(--text3)">${fmtDateShort(run.date)}</div>
                 </div>`;
-              // check if there's an actual run logged for this date
               const actual = state.runs.find(r => r.date === run.date);
-              const wi = plan.weeks.indexOf(week);
               return `
                 <div class="plan-run-item">
                   <div class="plan-run-day">${run.day}</div>
-                  <div class="plan-run-type type-${run.type}">${run.type.toUpperCase()}</div>
-                  <div>
-                    <div class="plan-run-dist">${run.km}</div>
-                    <div class="plan-run-km">KM</div>
+                  <div style="flex:1;min-width:0">
+                    <div class="plan-run-type type-${run.type}">${run.type.toUpperCase()}</div>
+                    ${run.purpose ? `<div style="font-size:11px;color:var(--text2);margin-top:1px">${run.purpose}</div>` : ''}
+                    <div style="font-size:10px;color:var(--text3);margin-top:2px">
+                      ${[
+                        run.km ? run.km+'km' : '',
+                        run.duration ? run.duration : '',
+                        run.targetPace ? '@ '+run.targetPace : '',
+                        run.targetHR ? '❤ '+run.targetHR : '',
+                      ].filter(Boolean).join(' · ')}
+                    </div>
+                    ${run.notes ? `<div style="font-size:10px;color:var(--text3);margin-top:2px;font-style:italic">${run.notes}</div>` : ''}
                   </div>
-                  ${actual ? `<div style="font-size:11px;color:var(--green);letter-spacing:1px;font-family:var(--font-display)">✓ ${parseFloat(actual.distance).toFixed(1)}km</div>` : ''}
+                  ${actual ? `<div style="font-size:11px;color:var(--green);letter-spacing:1px;font-family:var(--font-display);text-align:right">✓<br>${parseFloat(actual.distance).toFixed(1)}km</div>` : ''}
                   <div class="plan-run-check ${run.completed ? 'done' : ''}"
                     onclick="toggleRunComplete('${planId}',${wi},${ri},event)">
                     ${run.completed ? '✓' : ''}
@@ -567,10 +699,12 @@ function viewPlan(planId) {
                 </div>`;
             }).join('')}
           </div>
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
     </div>
-    <div style="margin-top:12px;display:flex;gap:10px;">
-      <button class="btn-secondary" onclick="deletePlan('${planId}')">DELETE PLAN</button>
+    <div style="margin-top:16px;display:flex;gap:10px;">
+      <button class="btn-secondary" style="flex:1" onclick="editPlan('${planId}')">EDIT PLAN</button>
+      <button class="btn-danger" style="flex:1" onclick="deletePlan('${planId}')">DELETE</button>
     </div>`;
   openModal('modalViewPlan');
 }
@@ -582,6 +716,26 @@ function toggleRunComplete(planId, weekIdx, runIdx, event) {
   plan.weeks[weekIdx].runs[runIdx].completed = !plan.weeks[weekIdx].runs[runIdx].completed;
   save();
   viewPlan(planId);
+}
+
+function editPlan(planId) {
+  // Load plan into draft and reopen builder at step 2
+  const plan = state.plans.find(p => p.id === planId);
+  if (!plan) return;
+  closeModal('modalViewPlan');
+  draftPlan = JSON.parse(JSON.stringify(plan));
+  draftPlan._editId = planId;
+  document.getElementById('planName').value = plan.name;
+  document.getElementById('planStart').value = plan.startDate;
+  document.getElementById('planEnd').value = plan.endDate || '';
+  document.getElementById('planGoal').value = plan.goal || '';
+  document.getElementById('planStep1').style.display = 'none';
+  document.getElementById('planStep2').style.display = '';
+  document.getElementById('planStepLabel').textContent = 'EDITING';
+  builderWeekIdx = 0;
+  renderWeekNav();
+  renderWeekBuilder(0);
+  openModal('modalNewPlan');
 }
 
 function deletePlan(planId) {
