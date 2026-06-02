@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>STRIDE — Your Running Coach</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;0,900;1,400&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Splash Screen -->
+    <div id="splash" class="splash">
+      <div class="splash-logo">
+        <svg class="splash-icon" viewBox="0 0 60 60" fill="none">
+          <path d="M10 45 L20 20 L30 32 L38 18 L50 15" stroke="#FF3D2E" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="50" cy="15" r="4" fill="#FF3D2E"/>
+        </svg>
+        <span class="splash-title">STRIDE</span>
+      </div>
+      <p class="splash-sub">YOUR PERSONAL RUNNING COACH</p>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="bottom-nav" id="bottomNav">
+      <button class="nav-item active" data-tab="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-tab="plan">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span>Plan</span>
+      </button>
+      <button class="nav-item nav-center" data-tab="log">
+        <div class="nav-center-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+      </button>
+      <button class="nav-item" data-tab="calendar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Calendar</span>
+      </button>
+      <button class="nav-item" data-tab="profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Profile</span>
+      </button>
+    </nav>
+
+    <!-- Tabs -->
+    <main class="main-content" id="mainContent">
+
+      <!-- ===== DASHBOARD ===== -->
+      <div id="tab-dashboard" class="tab active">
+        <header class="page-header">
+          <div>
+            <p class="header-label">GOOD MORNING</p>
+            <h1 class="header-title" id="userName">RUNNER</h1>
+          </div>
+          <div class="header-streak">
+            <span class="streak-fire">🔥</span>
+            <span class="streak-num" id="streakCount">0</span>
+          </div>
+        </header>
+
+        <div class="today-card">
+          <div class="today-label">TODAY'S SESSION</div>
+          <div id="todayRun" class="today-content">
+            <div class="today-empty">
+              <p>No run scheduled today</p>
+              <button class="btn-ghost" onclick="switchTab('plan')">Build your plan →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-val" id="weekKm">0.0</div>
+            <div class="stat-lbl">KM THIS WEEK</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="monthRuns">0</div>
+            <div class="stat-lbl">RUNS THIS MONTH</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="planProgress">0%</div>
+            <div class="stat-lbl">PLAN DONE</div>
+          </div>
+        </div>
+
+        <div class="section-title">RECENT RUNS</div>
+        <div id="recentRuns" class="run-list"></div>
+
+        <div class="section-title">PLAN VS ACTUAL</div>
+        <div class="chart-container" id="comparisonChart"></div>
+      </div>
+
+      <!-- ===== PLAN BUILDER ===== -->
+      <div id="tab-plan" class="tab">
+        <header class="page-header">
+          <div>
+            <p class="header-label">TRAINING</p>
+            <h1 class="header-title">PLAN</h1>
+          </div>
+          <button class="btn-icon" id="newPlanBtn" onclick="openNewPlan()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </header>
+
+        <div id="planList" class="plan-list"></div>
+        <div id="planEmpty" class="empty-state">
+          <div class="empty-icon">📋</div>
+          <p>No training plans yet.</p>
+          <button class="btn-primary" onclick="openNewPlan()">CREATE YOUR FIRST PLAN</button>
+        </div>
+      </div>
+
+      <!-- ===== LOG RUN ===== -->
+      <div id="tab-log" class="tab">
+        <header class="page-header">
+          <div>
+            <p class="header-label">LOG A</p>
+            <h1 class="header-title">RUN</h1>
+          </div>
+        </header>
+
+        <div class="log-form">
+          <div class="form-group">
+            <label>DATE</label>
+            <input type="date" id="logDate" class="form-input" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>DISTANCE (KM)</label>
+              <input type="number" id="logDist" class="form-input" placeholder="5.0" step="0.1" min="0" />
+            </div>
+            <div class="form-group">
+              <label>DURATION</label>
+              <input type="text" id="logTime" class="form-input" placeholder="25:00" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>PACE (min/km)</label>
+              <input type="text" id="logPace" class="form-input" placeholder="5:00" readonly />
+            </div>
+            <div class="form-group">
+              <label>AVG HEART RATE</label>
+              <input type="number" id="logHR" class="form-input" placeholder="155" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>RUN TYPE</label>
+            <div class="run-type-grid" id="runTypeGrid">
+              <button class="run-type-btn active" data-type="easy">Easy</button>
+              <button class="run-type-btn" data-type="tempo">Tempo</button>
+              <button class="run-type-btn" data-type="intervals">Intervals</button>
+              <button class="run-type-btn" data-type="long">Long Run</button>
+              <button class="run-type-btn" data-type="recovery">Recovery</button>
+              <button class="run-type-btn" data-type="race">Race</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>EFFORT (RPE)</label>
+            <div class="rpe-slider-wrap">
+              <input type="range" id="logRPE" class="rpe-slider" min="1" max="10" value="5" />
+              <span id="rpeVal">5</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>NOTES</label>
+            <textarea id="logNotes" class="form-input form-textarea" placeholder="How did it feel?"></textarea>
+          </div>
+          <button class="btn-primary" onclick="saveRun()">SAVE RUN</button>
+
+          <div class="divider-text">OR IMPORT</div>
+
+          <div class="garmin-section">
+            <div class="garmin-logo">
+              <svg viewBox="0 0 80 20" fill="currentColor"><text y="16" font-size="16" font-weight="bold" font-family="Arial">GARMIN</text></svg>
+            </div>
+            <p class="garmin-note">Garmin Connect sync requires a backend server for OAuth. Use the steps below to export manually:</p>
+            <div class="garmin-steps">
+              <div class="step"><span class="step-num">1</span> Open Garmin Connect app → Activities</div>
+              <div class="step"><span class="step-num">2</span> Export activity as .GPX or .FIT</div>
+              <div class="step"><span class="step-num">3</span> Import below</div>
+            </div>
+            <label class="file-drop" id="fileDrop">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span>Drop .GPX / .FIT file here</span>
+              <input type="file" id="fileInput" accept=".gpx,.fit" style="display:none" onchange="handleFileImport(event)" />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== CALENDAR ===== -->
+      <div id="tab-calendar" class="tab">
+        <header class="page-header">
+          <button class="btn-icon-sm" onclick="changeMonth(-1)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div class="cal-month-wrap">
+            <p class="header-label">CALENDAR</p>
+            <h1 class="header-title" id="calMonthTitle">JUNE 2026</h1>
+          </div>
+          <button class="btn-icon-sm" onclick="changeMonth(1)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </header>
+        <div class="cal-legend">
+          <div class="legend-item"><span class="dot dot-planned"></span> Planned</div>
+          <div class="legend-item"><span class="dot dot-completed"></span> Completed</div>
+          <div class="legend-item"><span class="dot dot-missed"></span> Missed</div>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+        <div class="cal-detail" id="calDetail"></div>
+      </div>
+
+      <!-- ===== PROFILE ===== -->
+      <div id="tab-profile" class="tab">
+        <header class="page-header">
+          <div>
+            <p class="header-label">YOUR</p>
+            <h1 class="header-title">PROFILE</h1>
+          </div>
+        </header>
+        <div class="profile-avatar" id="profileAvatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <div class="log-form">
+          <div class="form-group">
+            <label>YOUR NAME</label>
+            <input type="text" id="profileName" class="form-input" placeholder="Enter your name" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>AGE</label>
+              <input type="number" id="profileAge" class="form-input" placeholder="30" />
+            </div>
+            <div class="form-group">
+              <label>WEIGHT (KG)</label>
+              <input type="number" id="profileWeight" class="form-input" placeholder="70" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>FITNESS LEVEL</label>
+            <div class="run-type-grid">
+              <button class="run-type-btn active" data-level="beginner" onclick="setLevel(this)">Beginner</button>
+              <button class="run-type-btn" data-level="intermediate" onclick="setLevel(this)">Intermediate</button>
+              <button class="run-type-btn" data-level="advanced" onclick="setLevel(this)">Advanced</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>GOAL RACE</label>
+            <div class="run-type-grid">
+              <button class="run-type-btn" data-goal="5k" onclick="setGoal(this)">5K</button>
+              <button class="run-type-btn" data-goal="10k" onclick="setGoal(this)">10K</button>
+              <button class="run-type-btn" data-goal="half" onclick="setGoal(this)">Half</button>
+              <button class="run-type-btn active" data-goal="marathon" onclick="setGoal(this)">Marathon</button>
+            </div>
+          </div>
+          <button class="btn-primary" onclick="saveProfile()">SAVE PROFILE</button>
+
+          <div class="divider-text">STATS</div>
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-val" id="totalKm">0</div>
+              <div class="stat-lbl">TOTAL KM</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val" id="totalRuns">0</div>
+              <div class="stat-lbl">TOTAL RUNS</div>
+            </div>
+          </div>
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-val" id="bestPace">—</div>
+              <div class="stat-lbl">BEST PACE</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val" id="longestRun">0</div>
+              <div class="stat-lbl">LONGEST KM</div>
+            </div>
+          </div>
+
+          <div class="divider-text">DATA</div>
+          <button class="btn-secondary" onclick="exportData()">EXPORT ALL DATA</button>
+          <button class="btn-danger" onclick="confirmReset()">RESET ALL DATA</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ===== MODALS ===== -->
+
+  <!-- New Plan Modal — Step 1: Plan Details -->
+  <div id="modalNewPlan" class="modal-backdrop">
+    <div class="modal modal-full">
+      <div class="modal-header">
+        <h2>NEW PLAN <span id="planStepLabel" class="step-label">STEP 1 OF 2</span></h2>
+        <button onclick="closeModal('modalNewPlan')">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Step 1: Plan details -->
+        <div id="planStep1" class="log-form">
+          <div class="form-group">
+            <label>PLAN NAME</label>
+            <input type="text" id="planName" class="form-input" placeholder="e.g. Half Marathon Spring 2026" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>START DATE</label>
+              <input type="date" id="planStart" class="form-input" onchange="updatePlanDates()" />
+            </div>
+            <div class="form-group">
+              <label>END DATE</label>
+              <input type="date" id="planEnd" class="form-input" onchange="updatePlanDates()" />
+            </div>
+          </div>
+          <div class="plan-date-info" id="planDateInfo"></div>
+          <div class="form-group">
+            <label>GOAL / NOTES</label>
+            <textarea id="planGoal" class="form-input form-textarea" placeholder="e.g. Sub 2hr half marathon, building base fitness..."></textarea>
+          </div>
+          <button class="btn-primary" onclick="goToPlanStep2()">NEXT — BUILD WEEKS →</button>
+        </div>
+
+        <!-- Step 2: Week builder -->
+        <div id="planStep2" class="log-form" style="display:none">
+          <div class="plan-week-nav" id="planWeekNav"></div>
+          <div id="planWeekBuilder"></div>
+          <div style="display:flex;gap:10px;margin-top:8px">
+            <button class="btn-secondary" style="flex:1" onclick="goToPlanStep1()">← BACK</button>
+            <button class="btn-primary" style="flex:2" onclick="savePlan()">SAVE PLAN ✓</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- View Plan Modal -->
+  <div id="modalViewPlan" class="modal-backdrop">
+    <div class="modal modal-full">
+      <div class="modal-header">
+        <h2 id="viewPlanTitle">PLAN</h2>
+        <button onclick="closeModal('modalViewPlan')">✕</button>
+      </div>
+      <div class="modal-body" id="viewPlanBody"></div>
+    </div>
+  </div>
+
+  <!-- Run Detail Modal -->
+  <div id="modalRunDetail" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>RUN DETAILS</h2>
+        <button onclick="closeModal('modalRunDetail')">✕</button>
+      </div>
+      <div class="modal-body" id="runDetailBody"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");</script>
+</body>
+</html>
